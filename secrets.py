@@ -1,0 +1,7 @@
+#openai:
+OPENAI_API_KEY='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'
+
+#reddit:
+REDDIT_CLIENT_ID = 'xP1zeYC8GP263SoOLeedcQ'
+REDDIT_SECRET_KEY ='Xt0LXWzR0MhveLepg4BF5nHhhqGeiA'
+
