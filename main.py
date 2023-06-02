@@ -1,8 +1,14 @@
 import openai
-from secrets import *
+from SecretKeys import *
 import praw
 from datetime import datetime
 from tqdm import tqdm
+from Reddit import RedditPost
+from pytrends.request import TrendReq
+import pandas as pd
+
+reddit = praw.Reddit(client_id=REDDIT_CLIENT_ID, client_secret=REDDIT_SECRET_KEY, user_agent='scraper 1.0 algo-project')
+NUM_OF_STOCKS = 20
 
 def analyze_sentiment(text:str) -> int:
   openai.api_key = OPENAI_API_KEY
@@ -20,20 +26,19 @@ def analyze_sentiment(text:str) -> int:
   )
   answer=response.choices[0].message.content
   return int(answer) if answer.isdigit() else -1
-  
-def get_subreddit_posts(subreddit : str, limit:int) -> list:
-  reddit = praw.Reddit(client_id=REDDIT_CLIENT_ID, client_secret=REDDIT_SECRET_KEY, user_agent='scraper 1.0 algo-project')
-  posts = []
-  for post in reddit.subreddit(subreddit).new(limit=limit):
-    #check if post is a text post and not a meme, and not a daily discussion thread
-    if post.link_flair_text != 'Meme' and "Daily Discussion Thread" not in post.title:
-      #encode-decode will remove emojis from the title
-      title=post.title.encode('ascii', 'ignore').decode()
-      posts.append(title)
 
-      #If we will need dates to backtest:
-      #posted_date = datetime.utcfromtimestamp(post.created_utc)
-    
+def get_subreddits_posts(subreddits : list[str], limit:int) -> list[RedditPost]:
+  posts = []
+  #print('Getting posts from r/'+subreddit+'...')
+  for subreddit in subreddits:
+    for post in tqdm(reddit.subreddit(subreddit).new(limit=limit), desc=f"Fetching posts from {subreddit}"):
+      #check if post is a text post and not a meme, and not a daily discussion thread
+      if post.link_flair_text != 'Meme' and "Daily Discussion Thread" not in post.title:
+        #encode-decode will remove emojis from the title
+        title=post.title.encode('ascii', 'ignore').decode()
+        posts.append(RedditPost(title, post.ups, post.downs, post.num_comments))
+        #If we will need dates to backtest:
+        #posted_date = datetime.utcfromtimestamp(post.created_utc)
   return posts  
   
 def get_reddit_stock_posts(stock:str, limit:int)->list:
@@ -49,15 +54,76 @@ def get_reddit_stock_posts(stock:str, limit:int)->list:
       #If we will need dates to backtest:
       #posted_date = datetime.utcfromtimestamp(post.created_utc)
     
+
+def find_stock_interest(stock_list, timeframe = 'now 1-d'):
+    pytrends = TrendReq(hl='en-US', tz=360)
+
+    # Store the results for each stock
+    results = []
+
+    # API can only handle 5 keywords at a time, so split stocks into chunks of 5
+    chunk_size = 5
+    stock_chunks = [stock_list[i:i+chunk_size] for i in range(0, len(stock_list), chunk_size)]
+
+    # Iterate over stock chunks and retrieve the interest over time
+    # Calculate interest score every 8 minutes for 24 hours, and make an average for each stock 
+    for chunk in tqdm(stock_chunks,desc=f"Getting trend scores for the stocks from Google Trends.."):
+        pytrends.build_payload(kw_list=chunk, timeframe=timeframe)
+        interest_over_time_df = pytrends.interest_over_time()
+        results.append(interest_over_time_df)
+    
+    # Concatenate the results and compute the average of interest across all stocks
+    combined_results = pd.concat(results, axis=1)
+
+    return combined_results.mean()
+
+
+def get_most_talked_stocks() -> list[str]:
+  ''' 
+    Get the top 20 most talked about stocks on Google
+    Use Google Trends API to get the interest over the last day for each stock in S&P 500
+    Return the top 20 stocks
+  '''
+  company_names = pd.read_csv('CompanyNames.csv')
+  company_names = company_names['Company Name'].to_list()
+
+  stock_interests = find_stock_interest(company_names, timeframe='now 1-d')
+  stock_interests = stock_interests.sort_values(ascending=False)
+
+  most_talked_about_stocks = stock_interests.head(NUM_OF_STOCKS).index.to_list()
+  return most_talked_about_stocks
+
+
 def main():
-  stocks=['TESLA'  ,'GOOGLE','MICROSOFT','APPLE']
-  posts=get_subreddit_posts(subreddit="wallstreetbets", limit=500)
+  #stocks=['TESLA','GOOGLE','MICROSOFT','APPLE']
+  stocks = get_most_talked_stocks()
+  print('\n\n\nMost talked about stocks: ', stocks, '\n\n\n')
+
+  subreddits = ['wallstreetbets','stocks','investing']
+  posts=get_subreddits_posts(subreddits=subreddits, limit=500)
   #keep only posts that contain the stock name
+  
+  # Create a dictionary to store posts for each stock
+  stock_posts = {stock: [] for stock in stocks}
+
+  # Keep only posts that contain the stock name
   for post in posts:
-    if any(stock in post.upper() for stock in stocks):
-      print(post)#,'   ',analyze_sentiment(post))
+      for stock in stocks:
+          if stock in post.title.upper():
+              stock_posts[stock].append(post)
+              break
+
+  # Print the posts for each stock
+  for stock, stock_post_list in stock_posts.items():
+      print(f"\n\n\nPosts for {stock}:")
+      for post in stock_post_list:
+          print(post.title, post.ups, post.downs, post.num_comments, sep=" | ")
+          print(f"Sentiment: {analyze_sentiment(post.title)}\n\n")
   
   
-  
+
 if __name__ == "__main__":
-  main()
+  #main()
+  stocks = get_most_talked_stocks()
+  print('\n\n\nMost talked about stocks: ', stocks, '\n\n\n')
+

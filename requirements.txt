@@ -1,3 +1,7 @@
 openai
 praw
 tqdm
+pytrends
+numpy
+beautifulsoup4
+requests
