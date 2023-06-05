@@ -4,3 +4,4 @@ class RedditPost:
         self.ups = ups
         self.downs = downs
         self.num_comments = num_comments
+        self.sentiment=-1
