@@ -5,3 +5,10 @@ pytrends
 numpy
 beautifulsoup4
 requests
+yfinance
+pandas == 1.5.3
+backtesting
+matplotlib
+sklearn
+scikit-learn
+xgboost
