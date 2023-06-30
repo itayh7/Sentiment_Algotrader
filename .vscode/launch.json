@@ -8,7 +8,7 @@
             "name": "Python: main",
             "type": "python",
             "request": "launch",
-            "program": "main.py",
+            "program": "model_train_and_backtesting.py",
             "console": "integratedTerminal",
             "justMyCode": true
         }
