@@ -2,6 +2,7 @@
 This project leverages sentiment analysis from social media platforms, news articles, financial reports, and the MACD (Moving Average Convergence Divergence) indicator to make stock trading decisions.
 
 To make sense of all this data, we use an XGBoost model, which would help us predict which stocks are likely to do well.
+This was made as a part of the Algotraiding program of Ben Gurion University, chosen as the winning project by 4 Algotraiding companies.
 
 ## Installation
 Install the required packages in the wanted environment
